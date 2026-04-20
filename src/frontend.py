@@ -6,14 +6,13 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import os
 
-# -------------------------------
-# PAGE CONFIG
-# -------------------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BASE_DIR)
+
+
 st.set_page_config(page_title="Customer Churn Prediction", layout="wide")
 
-# -------------------------------
-# CUSTOM UI
-# -------------------------------
+# UI
 st.markdown("""
 <style>
 
@@ -134,77 +133,72 @@ h1 {
 </style>
 """, unsafe_allow_html=True)
 
-# -------------------------------
-# LOAD MODEL
-# -------------------------------
+# Load Model
 try:
-    model = pickle.load(open("churn_model.pkl", "rb"))
-    model_features = model.feature_names_in_
-except:
+    model = pickle.load(open(os.path.join(ROOT_DIR, "churn_model.pkl"), "rb"))
+    model_features = pickle.load(open(os.path.join(ROOT_DIR, "model_columns.pkl"), "rb"))
+    st.sidebar.success("Model loaded successfully")
+except Exception as e:
     model = None
     model_features = []
+    st.sidebar.error(f"Model loading error: {e}")
 
-# -------------------------------
-# LOAD DATASET
-# -------------------------------
+# Load Dataset
 try:
-    df = pd.read_csv("your_dataset.csv")
-except:
+    df = pd.read_csv(os.path.join(ROOT_DIR, "ecommerce_customer_churn_dataset.csv"))
+except Exception as e:
     df = pd.DataFrame()
+    st.sidebar.error(f"Dataset loading error: {e}")
 
-# -------------------------------
-# FEATURE ALIGNMENT
-# -------------------------------
-def align_features(df, required_features):
+# Feature Alignment
+def align_features(input_df, required_features):
+    input_df = pd.get_dummies(input_df, drop_first=True)
+
     for col in required_features:
-        if col not in df.columns:
-            df[col] = 0
-    return df[required_features]
+        if col not in input_df.columns:
+            input_df[col] = 0
 
-# -------------------------------
-# SIDEBAR INPUT
-# -------------------------------
+    input_df = input_df[required_features]
+    return input_df
+
+# Input
 st.sidebar.header("📝 Customer Inputs")
 
 def user_input():
     data = {}
 
-    fields = {
-        "Age": (18, 70, 30),
-        "Membership_Years": (0, 10, 2),
-        "Login_Frequency": (0, 50, 10),
-        "Session_Duration_Avg": (1, 60, 15),
-        "Pages_Per_Session": (1, 20, 5),
-        "Cart_Abandonment_Rate": (0.0, 1.0, 0.3),
-        "Wishlist_Items": (0, 50, 5),
-        "Email_Open_Rate": (0.0, 1.0, 0.5),
-        "Customer_Service_Calls": (0, 20, 2),
-        "Product_Reviews_Written": (0, 50, 3),
-        "Social_Media_Engagement_Score": (0, 100, 50),
-        "Mobile_App_Usage": (0, 100, 40),
-        "Payment_Method_Diversity": (1, 5, 2),
-        "Lifetime_Value": (100, 10000, 2000),
-        "Credit_Balance": (0, 5000, 500)
-    }
+    data["Age"] = st.sidebar.slider("Age", 18, 75, 30)
+    data["Membership_Years"] = st.sidebar.slider("Membership Years", 0.0, 10.0, 2.0)
+    data["Login_Frequency"] = st.sidebar.slider("Login Frequency", 0.0, 50.0, 10.0)
+    data["Session_Duration_Avg"] = st.sidebar.slider("Session Duration Avg", 1.0, 80.0, 20.0)
+    data["Pages_Per_Session"] = st.sidebar.slider("Pages Per Session", 1.0, 25.0, 6.0)
+    data["Cart_Abandonment_Rate"] = st.sidebar.slider("Cart Abandonment Rate", 0.0, 100.0, 40.0)
+    data["Wishlist_Items"] = st.sidebar.slider("Wishlist Items", 0.0, 30.0, 4.0)
+    data["Total_Purchases"] = st.sidebar.slider("Total Purchases", 0.0, 130.0, 12.0)
+    data["Average_Order_Value"] = st.sidebar.slider("Average Order Value", 20.0, 10000.0, 120.0)
+    data["Days_Since_Last_Purchase"] = st.sidebar.slider("Days Since Last Purchase", 0.0, 300.0, 20.0)
+    data["Discount_Usage_Rate"] = st.sidebar.slider("Discount Usage Rate", 0.0, 100.0, 40.0)
+    data["Returns_Rate"] = st.sidebar.slider("Returns Rate", 0.0, 100.0, 5.0)
+    data["Email_Open_Rate"] = st.sidebar.slider("Email Open Rate", 0.0, 100.0, 20.0)
+    data["Customer_Service_Calls"] = st.sidebar.slider("Customer Service Calls", 0.0, 25.0, 5.0)
+    data["Product_Reviews_Written"] = st.sidebar.slider("Product Reviews Written", 0.0, 25.0, 2.0)
+    data["Social_Media_Engagement_Score"] = st.sidebar.slider("Social Media Engagement Score", 0.0, 100.0, 30.0)
+    data["Mobile_App_Usage"] = st.sidebar.slider("Mobile App Usage", 0.0, 65.0, 20.0)
+    data["Payment_Method_Diversity"] = st.sidebar.slider("Payment Method Diversity", 1.0, 5.0, 2.0)
+    data["Lifetime_Value"] = st.sidebar.slider("Lifetime Value", 0.0, 9000.0, 1200.0)
+    data["Credit_Balance"] = st.sidebar.slider("Credit Balance", 0.0, 7200.0, 1800.0)
 
-    for field, (min_val, max_val, default) in fields.items():
-        data[field] = st.sidebar.slider(field, min_val, max_val, default)
-
-    gender = st.sidebar.selectbox("Gender", ["Male", "Female"])
-    data["Gender"] = 1 if gender == "Male" else 0
+    data["Gender"] = st.sidebar.selectbox("Gender", ["Male", "Female"])
+    data["Country"] = st.sidebar.selectbox("Country", ["France", "UK", "Canada", "USA", "India", "Japan", "Germany", "Australia"])
+    data["City"] = st.sidebar.text_input("City", "New York")
+    data["Signup_Quarter"] = st.sidebar.selectbox("Signup Quarter", ["Q1", "Q2", "Q3", "Q4"])
 
     return pd.DataFrame([data])
 
 input_df = user_input()
 
-# -------------------------------
-# TITLE
-# -------------------------------
 st.title("📊 Customer Churn Prediction Dashboard")
 
-# -------------------------------
-# 1. INTRO PARAGRAPH
-# -------------------------------
 st.markdown('<div class="card">', unsafe_allow_html=True)
 st.markdown('<div class="section-title">📌 Why Churn Prediction Matters</div>', unsafe_allow_html=True)
 
@@ -214,9 +208,6 @@ Customer churn prediction is a critical task for businesses because retaining ex
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# -------------------------------
-# 2. USER INPUT DISPLAY
-# -------------------------------
 st.markdown('<div class="card">', unsafe_allow_html=True)
 st.markdown('<div class="section-title">📝 Customer Input Data</div>', unsafe_allow_html=True)
 
@@ -224,9 +215,7 @@ st.dataframe(input_df, use_container_width=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# -------------------------------
-# 3. PREDICTION
-# -------------------------------
+
 st.markdown('<div class="card">', unsafe_allow_html=True)
 st.markdown('<div class="section-title">🔮 Prediction Result</div>', unsafe_allow_html=True)
 
@@ -236,73 +225,78 @@ if st.button("Predict Churn"):
     else:
         try:
             aligned_df = align_features(input_df.copy(), model_features)
+
             prediction = model.predict(aligned_df)[0]
             prob = model.predict_proba(aligned_df)[0][1]
 
             if prediction == 1:
-                st.error(f"⚠️ High Risk of Churn ({prob:.2f})")
+                st.error(f"⚠️ High Risk of Churn ({prob*100:.2f}%)")
             else:
-                st.success(f"✅ Customer Likely to Stay ({prob:.2f})")
+                st.success(f"✅ Customer Likely to Stay ({prob*100:.2f}%)")
+
+            st.write(f"Churn Probability: {prob*100:.2f}%")
+            st.progress(float(prob))
+
+            if prob < 0.30:
+                risk_level = "Low Risk"
+            elif prob < 0.60:
+                risk_level = "Medium Risk"
+            else:
+                risk_level = "High Risk"
+
+            st.markdown(f"### Risk Level: {risk_level}")
+
+            if prob >= 0.60:
+                st.warning("Recommended Action: Offer discount, re-engagement email, and support follow-up.")
+            elif prob >= 0.30:
+                st.info("Recommended Action: Send personalised offers and monitor engagement.")
+            else:
+                st.success("Recommended Action: Customer is stable. Continue loyalty strategies.")
 
         except Exception as e:
             st.error(f"Error: {e}")
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# -------------------------------
-# 5. INSIGHT IMAGES WITH EXPLANATIONS
-# -------------------------------
 st.markdown('<div class="card">', unsafe_allow_html=True)
-st.markdown('<div class="section-title">📷 Visual Insights & Interpretation</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-title">📈 Customer vs Average Comparison</div>', unsafe_allow_html=True)
 
-image_files = ["Visualisations/insight1.png", "Visualisations/insight2.png", "Visualisations/insight3.png"]
+compare_cols = [
+    "Login_Frequency",
+    "Session_Duration_Avg",
+    "Pages_Per_Session",
+    "Cart_Abandonment_Rate",
+    "Email_Open_Rate",
+    "Customer_Service_Calls"
+]
 
-col1, col2, col3 = st.columns(3)
+if not df.empty:
+    avg_values = df[compare_cols].mean()
+    user_values = input_df[compare_cols].iloc[0]
 
-# ---- IMAGE 1 ----
-with col1:
-    if os.path.exists(image_files[0]):
-        img = Image.open(image_files[0])
-        st.image(img, use_container_width=True)
-        st.markdown("**Customer Churn Distribution**")
-        st.caption("""
-The dataset shows a clear imbalance where most customers are retained and fewer customers churn.  
-This indicates the need for careful model handling to avoid bias toward predicting non-churn.
-""")
-    else:
-        st.info("insight1.png not found")
+    compare_df = pd.DataFrame({
+        "Feature": compare_cols,
+        "Customer": user_values.values,
+        "Average": avg_values.values
+    })
 
-# ---- IMAGE 2 ----
-with col2:
-    if os.path.exists(image_files[1]):
-        img = Image.open(image_files[1])
-        st.image(img, use_container_width=True)
-        st.markdown("**Feature Correlation Heatmap**")
-        st.caption("""
-User engagement features such as login frequency and session duration are strongly correlated with each other.  
-Churn is negatively associated with engagement and positively linked to factors like cart abandonment and service calls.
-""")
-    else:
-        st.info("insight2.png not found")
+    fig, ax = plt.subplots(figsize=(10, 4))
+    x = np.arange(len(compare_df))
+    width = 0.35
 
-# ---- IMAGE 3 ----
-with col3:
-    if os.path.exists(image_files[2]):
-        img = Image.open(image_files[2])
-        st.image(img, use_container_width=True)
-        st.markdown("**Churn by Country**")
-        st.caption("""
-Higher churn counts in countries like the USA and UK are mainly due to larger customer bases.  
-The churn ratio remains fairly consistent across countries, indicating behavior matters more than location.
-""")
-    else:
-        st.info("insight3.png not found")
+    ax.bar(x - width/2, compare_df["Customer"], width, label="Customer")
+    ax.bar(x + width/2, compare_df["Average"], width, label="Average")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(compare_df["Feature"], rotation=45)
+    ax.set_title("Customer vs Dataset Average")
+    ax.legend()
+
+    st.pyplot(fig)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# -------------------------------
-# 6. FINAL INSIGHTS TEXT
-# -------------------------------
+
 st.markdown('<div class="card">', unsafe_allow_html=True)
 st.markdown('<div class="section-title">📖 Key Insights</div>', unsafe_allow_html=True)
 
